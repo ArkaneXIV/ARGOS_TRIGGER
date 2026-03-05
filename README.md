@@ -60,11 +60,18 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 .terminal{font-family:'Share Tech Mono',monospace;position:relative;overflow:hidden}
 .terminal::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.04) 50%,transparent 50%);background-size:100% 4px;animation:scan 6s linear infinite;pointer-events:none}
 @keyframes scan{0%{background-position:0 0}100%{background-position:0 200px}}
+.viewMode input,.viewMode button,.viewMode select,.viewMode .destroyToggle,.viewMode .itemDelete,.viewMode .delete,.viewMode .uploadBtn{pointer-events:none;opacity:.9}
+.viewMode #addMech{display:none!important}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header>ARGOS TRIGGER HANGAR</header>
-<button id="addMech">Add Mech</button>
+<div id="authBox" style="position:fixed;top:15px;right:15px;background:#111;padding:10px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,.5);z-index:999">
+<input id="passwordInput" type="password" placeholder="Password" style="background:#000;color:#fff;border:1px solid #333;padding:6px 8px;border-radius:4px;outline:none">
+<button id="authorizeBtn" style="margin-left:6px;padding:6px 10px;background:#222;color:white;border:1px solid #444;border-radius:4px;cursor:pointer">Authorize</button>
+</div>
+<button id="addMech" style="display:none">Add Mech</button>
 <div id="hangar"></div>
 
 <template id="mechTemplate">
@@ -127,15 +134,83 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 
 <script>
 const hangar=document.getElementById("hangar")
-const template=document.getElementById("mechTemplate")
 
-function saveHangar(){
-localStorage.setItem("argosHangar",hangar.innerHTML)
+/* EDIT MODE AUTH (Supabase password check) */
+const SUPABASE_URL="https://bnxxvbpjyuvjuqdjsxaw.supabase.co"
+const SUPABASE_KEY="sb_publishable_7Es2Dkzgh3iKMuFGpiyFgw_RubTfAt_"
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
+
+let editMode=false
+document.body.classList.add("viewMode")
+
+const addMechBtn=document.getElementById("addMech")
+const passwordInput=document.getElementById("passwordInput")
+const authorizeBtn=document.getElementById("authorizeBtn")
+
+async function authorizePassword(){
+ const pw=passwordInput.value
+ if(!pw)return
+ const enc=new TextEncoder().encode(pw)
+ const buf=await crypto.subtle.digest("SHA-256",enc)
+ const hash=[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("")
+
+ const {data}=await sb
+  .from("settings")
+  .select("value")
+  .eq("key","edit_password_hash")
+  .single()
+
+ if(data && data.value===hash){
+  editMode=true
+  document.body.classList.remove("viewMode")
+  addMechBtn.style.display="inline-block"
+
+  authorizeBtn.textContent="Authorized"
+  authorizeBtn.style.background="#1f8f3a"
+  authorizeBtn.style.borderColor="#1f8f3a"
+  authorizeBtn.style.color="#fff"
+  authorizeBtn.disabled=true
+  passwordInput.disabled=true
+}else{
+  alert("Incorrect password")
+ }
 }
 
-function loadHangar(){
-const data=localStorage.getItem("argosHangar")
-if(data){hangar.innerHTML=data;restoreEvents()}
+authorizeBtn.onclick=authorizePassword
+passwordInput.addEventListener("keydown",e=>{if(e.key==="Enter"){authorizePassword()}})
+const template=document.getElementById("mechTemplate")
+
+async function saveHangar(){
+ if(!editMode) return
+ const html = hangar.innerHTML
+ await sb
+  .from("hangar")
+  .update({ data: html })
+  .eq("id","main")
+}
+
+async function loadHangar()
+
+/* REALTIME VIEWER SYNC */
+sb.channel('hangar-live')
+.on('postgres_changes',{event:'UPDATE',schema:'public',table:'hangar'},payload=>{
+ if(payload.new && payload.new.data){
+  hangar.innerHTML = payload.new.data
+  restoreEvents()
+ }
+})
+.subscribe(){
+ const { data } = await sb
+  .from("hangar")
+  .select("data")
+  .eq("id","main")
+  .single()
+
+ if(data && data.data){
+  hangar.innerHTML = data.data
+  restoreEvents()
+ }
+}
 }
 
 function updatePips(container,count){
@@ -267,7 +342,7 @@ root.querySelector(".addLimited").onclick=()=>addItem(sysList,"Limited System",t
 })
 }
 
-addMech.onclick=createMech
+addMech.onclick=()=>{if(!editMode)return;createMech()}
 
 
 
