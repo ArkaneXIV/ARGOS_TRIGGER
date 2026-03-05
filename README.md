@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -29,16 +30,19 @@ label{font-size:12px;color:#aaa}
 .pips span{width:16px;height:16px;border:1px solid #666;display:inline-block;margin-right:3px;cursor:pointer}
 .pips span.active{background:#ff5a2b}
 button.small{background:#2a2f36;border:1px solid #555;color:white;padding:4px 8px;font-size:12px;cursor:pointer;margin-top:4px}
+button.small:hover{border-color:#ff5a2b;box-shadow:0 0 6px rgba(255,80,30,.8)}
 
 .item{display:flex;justify-content:space-between;align-items:center;border:1px solid #333;padding:6px 8px;margin-top:4px;gap:8px}
+.item>div:last-child{margin-left:auto;display:flex;align-items:center;gap:6px}
 .item input[type=number]{width:42px;background:#0f1318;border:1px solid #444;color:white;padding:2px 4px}
 
 .destroyed{opacity:.45;border-color:#aa2b2b;position:relative}
 .destroyed::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:#ff3c3c}
 
-.imageBox{text-align:center;margin-bottom:10px}
+.imageBox{display:flex;justify-content:center;align-items:center;margin:0 auto 10px auto;width:500px;height:500px;max-width:100%;border:none;overflow:hidden;align-self:center}
+.imageBox img{width:100%;height:100%;object-fit:cover;cursor:pointer;background:transparent;max-width:500px;max-height:500px}
 .uploadBtn{margin-top:6px;padding:6px 10px;border:1px solid #666;background:#1a1f26;font-family:Rajdhani;cursor:pointer;color:white}
-.imageBox img{max-width:100%;height:auto;cursor:pointer}
+
 select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 
 .coreBtn{padding:6px 10px;border:1px solid #555;background:#555;color:white;cursor:pointer}
@@ -153,6 +157,16 @@ e.preventDefault();let v=parseInt(container.dataset.value);if(v>0)v--;updatePips
 })
 }
 
+function enableDrag(list){
+let dragged=null
+list.querySelectorAll('.item').forEach(i=>{
+ i.draggable=true
+ i.addEventListener('dragstart',()=>{dragged=i})
+ i.addEventListener('dragover',e=>{e.preventDefault();const after=i.getBoundingClientRect().top+i.offsetHeight/2;if(e.clientY<after){list.insertBefore(dragged,i)}else{list.insertBefore(dragged,i.nextSibling)}})
+ i.addEventListener('drop',()=>{saveHangar()})
+})
+}
+
 function addItem(list,name,limited=false){
 const item=document.createElement("div");item.className="item"
 const label=document.createElement("input");label.value=name
@@ -176,6 +190,7 @@ right.appendChild(del)
 item.appendChild(label)
 item.appendChild(right)
 list.appendChild(item)
+enableDrag(list)
 saveHangar()
 }
 
@@ -233,6 +248,9 @@ if(core)core.onclick=()=>{core.classList.toggle("charged");core.textContent=core
 setupImage(root)
 
 root.querySelectorAll(".destroyToggle").forEach(btn=>btn.onclick=()=>{btn.closest(".item").classList.toggle("destroyed");saveHangar()})
+enableDrag(root.querySelector('.weapons .list'))
+enableDrag(root.querySelector('.systems .list'))
+
 root.querySelectorAll(".itemDelete").forEach(btn=>btn.onclick=()=>{btn.closest(".item").remove();saveHangar()})
 
 root.querySelectorAll(".pips").forEach(container=>{
