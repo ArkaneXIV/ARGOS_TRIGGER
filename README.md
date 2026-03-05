@@ -60,7 +60,7 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 .terminal{font-family:'Share Tech Mono',monospace;position:relative;overflow:hidden}
 .terminal::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.04) 50%,transparent 50%);background-size:100% 4px;animation:scan 6s linear infinite;pointer-events:none}
 @keyframes scan{0%{background-position:0 0}100%{background-position:0 200px}}
-.viewMode input,.viewMode button,.viewMode select,.viewMode .destroyToggle,.viewMode .itemDelete,.viewMode .delete,.viewMode .uploadBtn{pointer-events:none;opacity:.9}
+.viewMode .mech input,.viewMode .mech button,.viewMode .mech select,.viewMode .mech .destroyToggle,.viewMode .mech .itemDelete,.viewMode .mech .delete,.viewMode .mech .uploadBtn{pointer-events:none;opacity:.9}
 .viewMode #addMech{display:none!important}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -189,17 +189,7 @@ async function saveHangar(){
   .eq("id","main")
 }
 
-async function loadHangar()
-
-/* REALTIME VIEWER SYNC */
-sb.channel('hangar-live')
-.on('postgres_changes',{event:'UPDATE',schema:'public',table:'hangar'},payload=>{
- if(payload.new && payload.new.data){
-  hangar.innerHTML = payload.new.data
-  restoreEvents()
- }
-})
-.subscribe(){
+async function loadHangar(){
  const { data } = await sb
   .from("hangar")
   .select("data")
@@ -211,7 +201,16 @@ sb.channel('hangar-live')
   restoreEvents()
  }
 }
-}
+
+/* REALTIME VIEWER SYNC */
+sb.channel('hangar-live')
+ .on('postgres_changes',{event:'UPDATE',schema:'public',table:'hangar'},payload=>{
+  if(payload.new && payload.new.data){
+   hangar.innerHTML = payload.new.data
+   restoreEvents()
+  }
+ })
+ .subscribe()
 
 function updatePips(container,count){
 const pips=[...container.children]
