@@ -9,6 +9,11 @@ body{margin:0;background:#0e1114;color:#e6e6e6;font-family:Inter,sans-serif}
 body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
 header{font-family:Rajdhani;font-size:36px;letter-spacing:2px;padding:20px 30px;border-bottom:1px solid #333}
 #addMech{margin:20px 10px 20px 30px;padding:10px 18px;background:#2a2f36;border:1px solid #555;color:white;font-family:Rajdhani;cursor:pointer}
+#saveData{margin:20px 10px;padding:10px 18px;background:#2a2f36;border:1px solid #555;color:white;font-family:Rajdhani;cursor:pointer;display:none}
+#addMech:hover,#saveData:hover{border-color:#ff5a2b;box-shadow:0 0 10px rgba(255,80,30,.9)}
+#saveData.unsavedGlow{border-color:#ff5a2b;box-shadow:0 0 12px rgba(255,80,30,1)}
+#saveData.saving{border-color:#ffaa33;box-shadow:0 0 14px rgba(255,170,60,.9)}
+#saveData.saved{border-color:#2ecc71;box-shadow:0 0 14px rgba(46,204,113,.9)}
 
 #hangar{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px;padding:20px}
 .mech{background:linear-gradient(145deg,#1a1f26,#12161b);border:1px solid #333;padding:16px;position:relative;transition:.2s}
@@ -72,6 +77,7 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 <button id="authorizeBtn" style="margin-left:6px;padding:6px 10px;background:#222;color:white;border:1px solid #444;border-radius:4px;cursor:pointer">Authorize</button>
 </div>
 <button id="addMech" style="display:none">Add Mech</button>
+<button id="saveData">Save Data</button>
 <div id="hangar"></div>
 
 <template id="mechTemplate">
@@ -141,6 +147,8 @@ const SUPABASE_KEY="sb_publishable_7Es2Dkzgh3iKMuFGpiyFgw_RubTfAt_"
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
 
 let editMode=false
+let unsaved=false
+let manualSave=false
 document.body.classList.add("viewMode")
 
 const addMechBtn=document.getElementById("addMech")
@@ -164,6 +172,7 @@ async function authorizePassword(){
   editMode=true
   document.body.classList.remove("viewMode")
   addMechBtn.style.display="inline-block"
+ document.getElementById("saveData").style.display="inline-block"
 
   authorizeBtn.textContent="Authorized"
   authorizeBtn.style.background="#1f8f3a"
@@ -180,13 +189,36 @@ authorizeBtn.onclick=authorizePassword
 passwordInput.addEventListener("keydown",e=>{if(e.key==="Enter"){authorizePassword()}})
 const template=document.getElementById("mechTemplate")
 
+function markUnsaved(){
+ if(!editMode)return
+ unsaved=true
+ const btn=document.getElementById("saveData")
+ if(btn)btn.classList.add("unsavedGlow")
+}
+
 async function saveHangar(){
- if(!editMode) return
+ if(!editMode || !manualSave) return
+ const btn=document.getElementById("saveData")
+ if(btn){btn.classList.remove("unsavedGlow","saved");btn.classList.add("saving");btn.textContent="Saving..."}
+
  const html = hangar.innerHTML
  await sb
   .from("hangar")
   .update({ data: html })
   .eq("id","main")
+
+ manualSave=false
+ unsaved=false
+
+ if(btn){
+  btn.classList.remove("saving")
+  btn.classList.add("saved")
+  btn.textContent="Saved"
+  setTimeout(()=>{
+   btn.classList.remove("saved")
+   btn.textContent="Save Data"
+  },1200)
+ }
 }
 
 async function loadHangar(){
@@ -205,6 +237,8 @@ async function loadHangar(){
 /* REALTIME VIEWER SYNC */
 sb.channel('hangar-live')
  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'hangar'},payload=>{
+  // Prevent editor from overwriting their own local state
+  if(editMode) return
   if(payload.new && payload.new.data){
    hangar.innerHTML = payload.new.data
    restoreEvents()
@@ -216,7 +250,7 @@ function updatePips(container,count){
 const pips=[...container.children]
 pips.forEach((p,i)=>p.classList.toggle("active",i<count))
 container.dataset.value=count
-saveHangar()
+markUnsaved();saveHangar()
 }
 
 function createPips(container,max=4){
@@ -236,7 +270,7 @@ list.querySelectorAll('.item').forEach(i=>{
  i.draggable=true
  i.addEventListener('dragstart',()=>{dragged=i})
  i.addEventListener('dragover',e=>{e.preventDefault();const after=i.getBoundingClientRect().top+i.offsetHeight/2;if(e.clientY<after){list.insertBefore(dragged,i)}else{list.insertBefore(dragged,i.nextSibling)}})
- i.addEventListener('drop',()=>{saveHangar()})
+ i.addEventListener('drop',()=>{markUnsaved();saveHangar()})
 })
 }
 
@@ -253,10 +287,10 @@ right.appendChild(cur);right.appendChild(document.createTextNode("/"));right.app
 }
 
 const destroy=document.createElement("div");destroy.className="destroyToggle"
-destroy.onclick=()=>{item.classList.toggle("destroyed");saveHangar()}
+destroy.onclick=()=>{item.classList.toggle("destroyed");markUnsaved();saveHangar()}
 
 const del=document.createElement("div");del.className="itemDelete"
-del.onclick=()=>{item.remove();saveHangar()}
+del.onclick=()=>{item.remove();markUnsaved();saveHangar()}
 
 right.appendChild(destroy)
 right.appendChild(del)
@@ -264,7 +298,7 @@ item.appendChild(label)
 item.appendChild(right)
 list.appendChild(item)
 enableDrag(list)
-saveHangar()
+markUnsaved();saveHangar()
 }
 
 function setupImage(root){
@@ -275,7 +309,7 @@ btn.onclick=()=>input.click()
 input.onchange=e=>{
 const file=e.target.files[0]
 const reader=new FileReader()
-reader.onload=x=>{img.src=x.target.result;img.style.display="block";btn.style.display="none";saveHangar()}
+reader.onload=x=>{img.src=x.target.result;img.style.display="block";btn.style.display="none";markUnsaved();saveHangar()}
 reader.readAsDataURL(file)
 }
 img.onclick=()=>input.click()
@@ -294,7 +328,7 @@ const core=root.querySelector(".coreBtn")
 core.onclick=()=>{
 if(core.classList.contains("charged")){core.classList.remove("charged");core.textContent="Expended"}
 else{core.classList.add("charged");core.textContent="Charged"}
-saveHangar()
+markUnsaved();saveHangar()
 }
 
 const weaponList=root.querySelector(".weapons .list")
@@ -308,23 +342,23 @@ root.querySelector(".addLimited").onclick=()=>addItem(sysList,"Limited System",t
 setupImage(root)
 
 hangar.appendChild(mech)
-saveHangar()
+markUnsaved();saveHangar()
 }
 
 function restoreEvents(){
 document.querySelectorAll(".mech").forEach(root=>{
-root.querySelector(".delete").onclick=()=>{root.remove();saveHangar()}
+root.querySelector(".delete").onclick=()=>{root.remove();markUnsaved();saveHangar()}
 
 const core=root.querySelector(".coreBtn")
-if(core)core.onclick=()=>{core.classList.toggle("charged");core.textContent=core.classList.contains("charged")?"Charged":"Expended";saveHangar()}
+if(core)core.onclick=()=>{core.classList.toggle("charged");core.textContent=core.classList.contains("charged")?"Charged":"Expended";markUnsaved();saveHangar()}
 
 setupImage(root)
 
-root.querySelectorAll(".destroyToggle").forEach(btn=>btn.onclick=()=>{btn.closest(".item").classList.toggle("destroyed");saveHangar()})
+root.querySelectorAll(".destroyToggle").forEach(btn=>btn.onclick=()=>{btn.closest(".item").classList.toggle("destroyed");markUnsaved();saveHangar()})
 enableDrag(root.querySelector('.weapons .list'))
 enableDrag(root.querySelector('.systems .list'))
 
-root.querySelectorAll(".itemDelete").forEach(btn=>btn.onclick=()=>{btn.closest(".item").remove();saveHangar()})
+root.querySelectorAll(".itemDelete").forEach(btn=>btn.onclick=()=>{btn.closest(".item").remove();markUnsaved();saveHangar()})
 
 root.querySelectorAll(".pips").forEach(container=>{
 container.addEventListener("click",()=>{let v=parseInt(container.dataset.value||0);if(v<4)v++;updatePips(container,v)})
@@ -341,11 +375,17 @@ root.querySelector(".addLimited").onclick=()=>addItem(sysList,"Limited System",t
 })
 }
 
+document.getElementById("saveData").onclick=()=>{manualSave=true;markUnsaved();saveHangar()}
+
 addMech.onclick=()=>{if(!editMode)return;createMech()}
 
 
 
 /* GLOBAL DELETE HANDLERS (ensures buttons work after restore) */
+/* TRACK INPUT CHANGES SO ALL DATA SAVES */
+hangar.addEventListener("input",e=>{ if(editMode){ markUnsaved(); } })
+hangar.addEventListener("change",e=>{ if(editMode){ markUnsaved(); } })
+
 hangar.addEventListener("click",e=>{
  const repair=e.target.closest(".fullRepairBtn")
  if(repair){
@@ -378,7 +418,7 @@ hangar.addEventListener("click",e=>{
    void repair.offsetWidth
    repair.classList.add("repairFlash")
 
-   saveHangar()
+   markUnsaved();saveHangar()
   }
   return
  }
@@ -388,7 +428,7 @@ hangar.addEventListener("click",e=>{
   const item=itemDel.closest(".item")
   if(item){
    item.remove()
-   saveHangar()
+   markUnsaved();saveHangar()
   }
   return
  }
@@ -398,7 +438,7 @@ hangar.addEventListener("click",e=>{
   const mech=mechDel.closest(".mech")
   if(mech){
    mech.remove()
-   saveHangar()
+   markUnsaved();saveHangar()
   }
  }
 })
@@ -409,5 +449,4 @@ loadHangar()
 </body>
 </html>
 
-</body>
 </html>
