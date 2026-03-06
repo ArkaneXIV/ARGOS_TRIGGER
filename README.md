@@ -8,6 +8,8 @@
 body{margin:0;background:#0e1114;color:#e6e6e6;font-family:Inter,sans-serif}
 body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
 header{font-family:Rajdhani;font-size:36px;letter-spacing:2px;padding:14px 30px;border-bottom:1px solid #333;display:flex;align-items:center;gap:16px}
+#musicToggle{margin-left:auto;background:#2a2f36;border:1px solid #555;color:white;font-family:Rajdhani;padding:6px 12px;cursor:pointer}
+#musicToggle:hover{border-color:#ff5a2b;box-shadow:0 0 10px rgba(255,80,30,.9)}
 .headerEmblem{width:64px;height:64px;object-fit:contain;transition:filter .25s ease,transform .25s ease}
 .headerEmblem:hover{filter:drop-shadow(0 0 8px rgba(255,90,43,.9)) drop-shadow(0 0 16px rgba(255,90,43,.6));transform:scale(1.05)}
 #addMech{margin:20px 10px 20px 30px;padding:10px 18px;background:#2a2f36;border:1px solid #555;color:white;font-family:Rajdhani;cursor:pointer}
@@ -73,11 +75,22 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<header><img class="headerEmblem" src="images/ARGOSemblem_White.png" alt="ARGOS Emblem">ARGOS TRIGGER HANGAR</header>
-<div id="authBox" style="position:fixed;top:15px;right:15px;background:#111;padding:10px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,.5);z-index:999">
+<audio id="bgMusic" loop>
+  <source src="audio/hangar_theme.mp3" type="audio/mpeg">
+</audio>
+<header>
+<img class="headerEmblem" src="images/ARGOSemblem_White.png" alt="ARGOS Emblem">
+ARGOS TRIGGER HANGAR
+
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+<button id="musicToggle">Music: Off</button>
+
+<div id="authBox" style="display:flex;align-items:center;gap:6px">
 <input id="passwordInput" type="password" placeholder="Password" style="background:#000;color:#fff;border:1px solid #333;padding:6px 8px;border-radius:4px;outline:none">
-<button id="authorizeBtn" style="margin-left:6px;padding:6px 10px;background:#222;color:white;border:1px solid #444;border-radius:4px;cursor:pointer">Authorize</button>
+<button id="authorizeBtn" style="padding:6px 10px;background:#222;color:white;border:1px solid #444;border-radius:4px;cursor:pointer">Authorize</button>
 </div>
+</div>
+</header>
 <button id="addMech" style="display:none">Add Mech</button>
 <button id="saveData">Save Data</button>
 <div id="hangar"></div>
@@ -142,6 +155,37 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 
 <script>
 const hangar=document.getElementById("hangar")
+
+/* BACKGROUND MUSIC */
+const bgMusic=document.getElementById("bgMusic")
+const musicToggle=document.getElementById("musicToggle")
+let musicStarted=false
+
+if(bgMusic){
+ bgMusic.volume=0.35
+
+ const startMusic=()=>{
+  if(!musicStarted){
+   bgMusic.play().catch(()=>{})
+   musicStarted=true
+   if(musicToggle) musicToggle.textContent="Music: On"
+  }
+ }
+
+ document.addEventListener("click",startMusic,{once:true})
+
+ if(musicToggle){
+  musicToggle.onclick=()=>{
+   if(bgMusic.paused){
+    bgMusic.play().catch(()=>{})
+    musicToggle.textContent="Music: On"
+   }else{
+    bgMusic.pause()
+    musicToggle.textContent="Music: Off"
+   }
+  }
+ }
+}
 
 /* EDIT MODE AUTH (Supabase password check) */
 const SUPABASE_URL="https://bnxxvbpjyuvjuqdjsxaw.supabase.co"
