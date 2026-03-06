@@ -343,14 +343,25 @@ function setupImage(root){
 const img=root.querySelector("img")
 const input=root.querySelector("input[type=file]")
 const btn=root.querySelector(".uploadBtn")
-btn.onclick=()=>input.click()
+
+function openFile(){ if(!editMode) return; input.click() }
+
+btn.onclick=openFile
+
 input.onchange=e=>{
-const file=e.target.files[0]
-const reader=new FileReader()
-reader.onload=x=>{img.src=x.target.result;img.style.display="block";btn.style.display="none";markUnsaved();saveHangar()}
-reader.readAsDataURL(file)
+ if(!editMode) return
+ const file=e.target.files[0]
+ const reader=new FileReader()
+ reader.onload=x=>{
+  img.src=x.target.result
+  img.style.display="block"
+  btn.style.display="none"
+  markUnsaved();saveHangar()
+ }
+ reader.readAsDataURL(file)
 }
-img.onclick=()=>input.click()
+
+img.onclick=openFile
 }
 
 function createMech(){
@@ -385,7 +396,11 @@ markUnsaved();saveHangar()
 
 function restoreEvents(){
 document.querySelectorAll(".mech").forEach(root=>{
-root.querySelector(".delete").onclick=()=>{root.remove();markUnsaved();saveHangar()}
+root.querySelector(".delete").onclick=()=>{
+ if(!editMode) return
+ if(!confirm("Delete this mech?")) return
+ root.remove();markUnsaved();saveHangar()
+}
 
 const core=root.querySelector(".coreBtn")
 if(core)core.onclick=()=>{core.classList.toggle("charged");core.textContent=core.classList.contains("charged")?"Charged":"Expended";markUnsaved();saveHangar()}
@@ -440,11 +455,11 @@ hangar.addEventListener("click",e=>{
     if(nums.length===2){nums[0].value=nums[1].value}
    })
 
-      mech.querySelectorAll(".pips").forEach(p=>{
+   mech.querySelectorAll(".pips").forEach(p=>{
     const spans=[...p.children]
     p.dataset.value=4
     spans.forEach((s,i)=>s.classList.toggle("active",i<4))
-})
+   })
 
    const core=mech.querySelector(".coreBtn")
    if(core){core.classList.add("charged");core.textContent="Charged"}
@@ -473,8 +488,10 @@ hangar.addEventListener("click",e=>{
 
  const mechDel=e.target.closest(".delete")
  if(mechDel){
+  if(!editMode) return
   const mech=mechDel.closest(".mech")
   if(mech){
+   if(!confirm("Delete this mech?")) return
    mech.remove()
    markUnsaved();saveHangar()
   }
