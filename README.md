@@ -7,7 +7,9 @@
 <style>
 body{margin:0;background:#0e1114;color:#e6e6e6;font-family:Inter,sans-serif}
 body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
-header{font-family:Rajdhani;font-size:36px;letter-spacing:2px;padding:20px 30px;border-bottom:1px solid #333}
+header{font-family:Rajdhani;font-size:36px;letter-spacing:2px;padding:14px 30px;border-bottom:1px solid #333;display:flex;align-items:center;gap:16px}
+.headerEmblem{width:64px;height:64px;object-fit:contain;transition:filter .25s ease,transform .25s ease}
+.headerEmblem:hover{filter:drop-shadow(0 0 8px rgba(255,90,43,.9)) drop-shadow(0 0 16px rgba(255,90,43,.6));transform:scale(1.05)}
 #addMech{margin:20px 10px 20px 30px;padding:10px 18px;background:#2a2f36;border:1px solid #555;color:white;font-family:Rajdhani;cursor:pointer}
 #saveData{margin:20px 10px;padding:10px 18px;background:#2a2f36;border:1px solid #555;color:white;font-family:Rajdhani;cursor:pointer;display:none}
 #addMech:hover,#saveData:hover{border-color:#ff5a2b;box-shadow:0 0 10px rgba(255,80,30,.9)}
@@ -71,7 +73,7 @@ select{background:#0f1318;border:1px solid #444;color:white;padding:3px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<header>ARGOS TRIGGER HANGAR</header>
+<header><img class="headerEmblem" src="images/ARGOSemblem_White.png" alt="ARGOS Emblem">ARGOS TRIGGER HANGAR</header>
 <div id="authBox" style="position:fixed;top:15px;right:15px;background:#111;padding:10px;border-radius:8px;box-shadow:0 0 10px rgba(0,0,0,.5);z-index:999">
 <input id="passwordInput" type="password" placeholder="Password" style="background:#000;color:#fff;border:1px solid #333;padding:6px 8px;border-radius:4px;outline:none">
 <button id="authorizeBtn" style="margin-left:6px;padding:6px 10px;background:#222;color:white;border:1px solid #444;border-radius:4px;cursor:pointer">Authorize</button>
@@ -147,6 +149,7 @@ const SUPABASE_KEY="sb_publishable_7Es2Dkzgh3iKMuFGpiyFgw_RubTfAt_"
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
 
 let editMode=false
+let saving=false
 let unsaved=false
 let manualSave=false
 document.body.classList.add("viewMode")
@@ -198,26 +201,61 @@ function markUnsaved(){
 
 async function saveHangar(){
  if(!editMode || !manualSave) return
- const btn=document.getElementById("saveData")
- if(btn){btn.classList.remove("unsavedGlow","saved");btn.classList.add("saving");btn.textContent="Saving..."}
+ if(saving) return
+ saving = true
 
- const html = hangar.innerHTML
- await sb
-  .from("hangar")
-  .update({ data: html })
-  .eq("id","main")
-
- manualSave=false
- unsaved=false
-
+ const btn = document.getElementById("saveData")
  if(btn){
-  btn.classList.remove("saving")
-  btn.classList.add("saved")
-  btn.textContent="Saved"
+  btn.classList.remove("unsavedGlow","saved")
+  btn.classList.add("saving")
+  btn.textContent = "Saving..."
+ }
+
+ try{
+  // Ensure form values persist in saved HTML
+  const clone = hangar.cloneNode(true)
+
+  clone.querySelectorAll('input').forEach(i=>{
+   if(i.type==='number' || i.type==='text') i.setAttribute('value',i.value)
+  })
+
+  clone.querySelectorAll('select').forEach(s=>{
+   s.querySelectorAll('option').forEach(o=>o.removeAttribute('selected'))
+   const opt=[...s.options].find(o=>o.value===s.value || o.text===s.value)
+   if(opt) opt.setAttribute('selected','selected')
+  })
+
+  const html = clone.innerHTML
+
+  await sb
+   .from("hangar")
+   .update({ data: html })
+   .eq("id","main")
+
+  manualSave = false
+  unsaved = false
+
+  if(btn){
+   btn.classList.remove("saving")
+   btn.classList.add("saved")
+   btn.textContent = "Saved"
+  }
+
   setTimeout(()=>{
-   btn.classList.remove("saved")
-   btn.textContent="Save Data"
+   if(btn){
+    btn.classList.remove("saved")
+    btn.textContent = "Save Data"
+   }
+   saving = false
   },1200)
+
+ }catch(e){
+  console.error(e)
+  if(btn){
+   btn.classList.remove("saving")
+   btn.textContent = "Save Failed"
+  }
+  saving = false
  }
 }
 
@@ -445,8 +483,3 @@ hangar.addEventListener("click",e=>{
 
 loadHangar()
 </script>
-
-</body>
-</html>
-
-</html>
