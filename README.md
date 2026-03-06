@@ -162,7 +162,7 @@ const musicToggle=document.getElementById("musicToggle")
 let musicStarted=false
 
 if(bgMusic){
- bgMusic.volume=0.35
+ bgMusic.volume=0.25
 
  const startMusic=()=>{
   if(!musicStarted){
